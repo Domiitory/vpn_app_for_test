@@ -15,7 +15,7 @@ class _GearWidgetState extends State<GearWidget>
   @override
   void initState() {
     controller = AnimationController(
-        vsync: this, duration: Duration(milliseconds: 4000));
+        vsync: this, duration: const Duration(milliseconds: 4000));
     rotation = Tween(begin: 0.0, end: 2.0).animate(controller);
     super.initState();
   }
