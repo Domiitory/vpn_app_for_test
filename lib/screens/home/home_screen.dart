@@ -1,6 +1,9 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_vpn/state.dart';
 import 'package:vpn_app_for_test/constants.dart';
+import 'package:vpn_app_for_test/utils/util.dart';
 import 'package:vpn_app_for_test/widgets/network_speed_widget.dart';
 import 'package:flutter_vpn/flutter_vpn.dart';
 
@@ -16,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   var state = FlutterVpnState.disconnected;
   CharonErrorState? charonState = CharonErrorState.NO_ERROR;
   @override
+  // initialize vpn
   void initState() {
     FlutterVpn.prepare();
     FlutterVpn.onStateChanged.listen((s) => setState(() => state = s));
@@ -24,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    Utils vpnUtils = Utils();
     var size = MediaQuery.of(context).size;
     return Scaffold(
       appBar: AppBar(
@@ -48,11 +53,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   _isactive = !_isactive;
                 });
                 if (_isactive == true) {
-                  FlutterVpn.connectIkev2EAP(
-                    server: "us.freeikev2vpn.com",
-                    username: "freeikev2vpn.com",
-                    password: "free",
-                  );
+                  try {
+                    FlutterVpn.connectIkev2EAP(
+                      server: vpnUtils.nameServer,
+                      username: vpnUtils.userName,
+                      password: vpnUtils.password,
+                    );
+                  } catch (e) {
+                    log("$e");
+                  }
                 } else if (_isactive == false) {
                   FlutterVpn.disconnect();
                 }
