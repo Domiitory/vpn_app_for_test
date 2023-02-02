@@ -1,8 +1,11 @@
 import 'dart:developer';
+import 'package:check_vpn_connection/check_vpn_connection.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_vpn/state.dart';
 import 'package:vpn_app_for_test/constants.dart';
+import 'package:vpn_app_for_test/model/server.dart';
 import 'package:vpn_app_for_test/utils/util.dart';
 import 'package:vpn_app_for_test/widgets/network_speed_widget.dart';
 import 'package:flutter_vpn/flutter_vpn.dart';
@@ -15,12 +18,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  late Future<List<Server>> serversList;
   bool _isactive = false;
   var state = FlutterVpnState.disconnected;
   CharonErrorState? charonState = CharonErrorState.NO_ERROR;
+
+  get index => null;
   @override
   // initialize vpn
   void initState() {
+    serversList = getServer();
     FlutterVpn.prepare();
     FlutterVpn.onStateChanged.listen((s) => setState(() => state = s));
     super.initState();
@@ -30,123 +37,148 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     Utils vpnUtils = Utils();
     var size = MediaQuery.of(context).size;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          "VPN",
-          style: TextStyle(color: primaryColor, fontSize: 30),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: bgColor,
-      ),
-      backgroundColor: bgColor,
-      body: Column(
-        children: [
-          SizedBox(height: size.height * 0.2),
-          // VPN start/stop button
-          Center(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(150),
-              onTap: () {
-                setState(() {
-                  _isactive = !_isactive;
-                });
-                if (_isactive == true) {
-                  try {
-                    FlutterVpn.connectIkev2EAP(
-                      server: vpnUtils.nameServer,
-                      username: vpnUtils.userName,
-                      password: vpnUtils.password,
-                    );
-                  } catch (e) {
-                    log("$e");
-                  }
-                } else if (_isactive == false) {
-                  FlutterVpn.disconnect();
-                }
-              },
-              child: Material(
-                elevation: 5,
-                borderRadius: BorderRadius.circular(150),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color:
-                        _isactive == true ? Colors.greenAccent : primaryColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Container(
-                    height: 130,
-                    width: 130,
-                    decoration: const BoxDecoration(
-                      color: kWhiteColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.power_settings_new,
-                          size: 30,
-                          color: _isactive == true ? primaryColor : Colors.grey,
-                        ),
-                        const SizedBox(
-                          height: 10,
-                        ),
-                        Text(
-                          _isactive == true ? "STOP" : "START",
-                          style: TextStyle(
-                              color: _isactive == true
-                                  ? Colors.black
-                                  : Colors.grey,
-                              fontSize: 23,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+    return FutureBuilder<List<Server>>(
+        future: serversList,
+        builder: ((context, snapshot) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text(
+                "VPN",
+                style: TextStyle(color: primaryColor, fontSize: 30),
               ),
+              centerTitle: true,
+              elevation: 0,
+              backgroundColor: bgColor,
             ),
-          ),
-          const SizedBox(
-            height: 50,
-          ),
-          // Network speed value
-          const Text(
-            "Network speed",
-            style: TextStyle(
-                fontSize: 25, color: Colors.black, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(
-            height: 15,
-          ),
-
-          Padding(
-            padding: const EdgeInsets.only(left: 20.0, right: 20.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            backgroundColor: bgColor,
+            body: Column(
               children: [
-                NetworkSpeedWidget(
-                  bgIcnColor: primaryColor.withOpacity(0.2),
-                  icnColor: primaryColor,
-                  icon: Icons.arrow_downward,
-                  tText: "Download",
-                  sText: _isactive == true ? "128.00" : "00.00",
+                SizedBox(height: size.height * 0.2),
+                // VPN start/stop button
+                Center(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(150),
+                    onTap: () async {
+                      setState(() {
+                        _isactive = !_isactive;
+                      });
+                      if (_isactive == true) {
+                        try {
+                          FlutterVpn.connectIkev2EAP(
+                            server: snapshot.hasData
+                                ? snapshot.data![0].urlServer
+                                : vpnUtils.nameServer,
+                            username: snapshot.hasData
+                                ? snapshot.data![0].username
+                                : vpnUtils.userName,
+                            password: snapshot.hasData
+                                ? snapshot.data![0].password
+                                : vpnUtils.password,
+                          );
+                          if (await CheckVpnConnection.isVpnActive() == true) {
+                            log("succes connection");
+                          } else {
+                            log("have error, no connection to VPN");
+                            log("$CharonErrorState");
+                            FlutterVpn.disconnect();
+                            setState(() {
+                              _isactive = false;
+                            });
+                          }
+                        } catch (e) {
+                          log("$e");
+                        }
+                      } else if (_isactive == false) {
+                        FlutterVpn.disconnect();
+                      }
+                    },
+                    child: Material(
+                      elevation: 5,
+                      borderRadius: BorderRadius.circular(150),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _isactive == true
+                              ? Colors.greenAccent
+                              : primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Container(
+                          height: 130,
+                          width: 130,
+                          decoration: const BoxDecoration(
+                            color: kWhiteColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.power_settings_new,
+                                size: 30,
+                                color: _isactive == true
+                                    ? primaryColor
+                                    : Colors.grey,
+                              ),
+                              const SizedBox(
+                                height: 10,
+                              ),
+                              Text(
+                                _isactive == true ? "STOP" : "START",
+                                style: TextStyle(
+                                    color: _isactive == true
+                                        ? Colors.black
+                                        : Colors.grey,
+                                    fontSize: 23,
+                                    fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                NetworkSpeedWidget(
-                  bgIcnColor: primaryColor.withOpacity(0.2),
-                  icnColor: primaryColor,
-                  icon: Icons.arrow_downward,
-                  tText: "Upload",
-                  sText: _isactive == true ? "345.00" : "00.00",
+                const SizedBox(
+                  height: 50,
+                ),
+                // Network speed value
+                const Text(
+                  "Network speed",
+                  style: TextStyle(
+                      fontSize: 25,
+                      color: Colors.black,
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(
+                  height: 15,
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.only(left: 20.0, right: 20.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      NetworkSpeedWidget(
+                        bgIcnColor: primaryColor.withOpacity(0.2),
+                        icnColor: primaryColor,
+                        icon: Icons.arrow_downward,
+                        tText: "Download",
+                        sText: _isactive == true ? "128.00" : "00.00",
+                      ),
+                      NetworkSpeedWidget(
+                        bgIcnColor: primaryColor.withOpacity(0.2),
+                        icnColor: primaryColor,
+                        icon: Icons.arrow_downward,
+                        tText: "Upload",
+                        sText: _isactive == true ? "345.00" : "00.00",
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
+          );
+        }));
   }
 }
